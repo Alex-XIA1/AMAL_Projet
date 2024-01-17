@@ -39,7 +39,7 @@ testing_boundaries = np.load(path+'/testing_boundaries_concat_.npy',allow_pickle
 testing_graphs = np.load(path+'/testing_graphs_concat_.npy',allow_pickle=True)
 testing_labels = np.load(path+'/testing_labels_concat_.npy',allow_pickle=True)
 
-# POUR k = 0 et t = 0 la representation est juste un one hot encoding du type d'atome
+# POUR k = 0 et t = 0 la representation est juste un one hot encoding du type d'atome, pour k = 1 et 2, les matrices sont juste des matrices de 1 (on sait pas pourquoi)
 # x(k)_(t) : k = taille du simplexe (0 = les sommets, 1 = les aretes, 2 = les triangles), t = notion de t-hop de l'article
 # Les donnees ci-dessous sont ceux de la partie "precomputing simplicially aware features" fournies par les auteurs d'une phase sans apprentissage.
 x0_0_tr = np.load(path+'/x0_0_tr_concat_.npy',allow_pickle=True)
@@ -154,7 +154,9 @@ options = {
 # Pour afficher un graphe
 #print(training_graphs[0][0])
 G = dgl.to_networkx(training_graphs[0][0])
-#print("Les aretes ", len(G.out_edges))
+undirected = G.to_undirected() # On passe en non oriente car l'article le fait comme ca
+#print("Les aretes ", len(undirected.edges))
+#print(list(G.nodes(data=True))) # les atomes ne sont pas dans le dataset fourni (on prendra tel quel pour eviter de perdre du temps)
 plt.figure(figsize=[15,7])
 nx.draw(G, **options)
 # jolie proteine :D
