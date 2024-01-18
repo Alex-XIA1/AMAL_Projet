@@ -79,6 +79,68 @@ x2_0_tr = np.load(path+'/x2_0_tr_concat_.npy',allow_pickle=True)
 # x2_1_test = np.load(path+'/x2_1_test_concat_.npy',allow_pickle=True)
 # x2_2_test = np.load(path+'/x2_2_test_concat_.npy',allow_pickle=True)
 
+# Essai de fonction precomputing
+
+def testprecomputing(bk1,bk2,bk3,xk1,xk2,xk3):
+    """
+    bk1 : matrice incidence Nk-2 x Nk-1
+    bk2 : matrice incidence Nk-1 x Nk <- ce parametre pose un soucis de dimension
+    bk3 : matrice incidence Nk x Nk+1
+    xk2 : le vecteur entree (soit un one hot cf. Errica, soit un vecteur de 1 d'apres l'article )
+    xk1 et xk3 : idem
+    """
+    # Les 4 matrices 
+    # Dans le cas ou y'a un probleme (a cause de B(-1) et B(K+1)) <- dans le cas d'une erreur theorique
+
+    # dim Nk x Nk
+    aku = bk3@bk3.T
+    # dim Nk x Dk
+    yku = aku@xk2
+
+    # dim Nk x Nk
+    akl = bk2.T@bk2
+    # dim Nk x Dk
+    ykl = akl@xk2
+
+    # dim Nk-1 
+    #akb = bk1
+    # dim Nk-2 x Dk-1 <<<<<<<- PROBLEME DE DIMENSION : CRITIQUE A METTRE DANS LE POSTER
+    #ykb = akb@xk1
+
+    # dim Nk+1 x Nk
+    akc = bk3.T
+    #akc = bk3
+    #print(akc.shape)
+    #print(xk3.shape)
+    # dim Nk+1 x Dk+1 <- probleme de dimension ENCORE <------ ICI AUSSI CEST UNE CRITIQUE
+    ykc = akc@xk3
+
+    #return np.concatenate((yku,ykl,ykb,ykc))
+    return np.concatenate((yku,ykl,ykc))
+
+
+# matrice d'incidence en O((Nk-1 x Nk)**2)
+def makeIncidence(edges, threeclique):
+    """
+    edges : sommets networkx
+    threeclique : 3-cliques networkx
+    """
+    res = np.zeros((len(edges),len(threeclique)))
+    edgesl = list(edges)
+    threecliquel = list(threeclique)
+
+    for i in range(len(edgesl)):
+        count = 0
+        tmp1 = edgesl[i][0]
+        tmp2 = edgesl[i][1]
+        for j in range(len(threecliquel)):
+            tmp3 = threeclique[j]
+            if tmp1 in tmp3 and tmp2 in tmp3:
+                res[i,j] = 1.
+                count+=1
+                if count == 2 : break
+    return res
+
 
 class Model(nn.Module):
     # indim : dimension pour les donnees d'entree
@@ -138,9 +200,6 @@ class Model(nn.Module):
         return final_out
 
 
-
-
-
 # one hot du type d'atome (quels sont les atomes ?)
 #print(x0_0_tr[0][0])
 #print(x1_0_tr[0][0])
@@ -157,7 +216,28 @@ G = dgl.to_networkx(training_graphs[0][0])
 undirected = G.to_undirected() # On passe en non oriente car l'article le fait comme ca
 #print("Les aretes ", len(undirected.edges))
 #print(list(G.nodes(data=True))) # les atomes ne sont pas dans le dataset fourni (on prendra tel quel pour eviter de perdre du temps)
-plt.figure(figsize=[15,7])
-nx.draw(G, **options)
+#plt.figure(figsize=[15,7])
+#nx.draw(G, **options)
 # jolie proteine :D
-plt.show()
+#plt.show()
+
+# Trouver toutes les 3-cliques (2-simplex) avec networkx
+all_cliques= nx.enumerate_all_cliques(undirected)
+triad_cliques=[x for x in all_cliques if len(x)==3 ]
+#print(triad_cliques)
+
+# 2-clique = aretes
+
+twoclique = undirected.edges()
+
+oneclique = undirected.nodes()
+#print(twoclique)
+
+# Matrice d'incidencee b1 (taille N0 x N1)
+b1 = nx.incidence_matrix(undirected,oneclique,twoclique).todense()
+
+# Matrice d'incidence b2 (taille N1 x N2)
+b2 = makeIncidence(twoclique,triad_cliques)
+
+# On test pour k = 1
+test = testprecomputing(None,b1,b2,x0_0_tr[0][0],x1_0_tr[0][0],x2_0_tr[0][0])
