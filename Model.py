@@ -26,7 +26,8 @@ from sklearn.preprocessing import MinMaxScaler
 import networkx as nx
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import accuracy_score
-
+import torchmetrics as tm
+from tqdm import notebook, tqdm
 
 # Chargement des donnees ATTENTION, les donnees necesitte dlg version 0.9.1 les versions recentes causeront une erreur
 path = "./gc/proteins"
@@ -275,13 +276,15 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     allLoss = []
 
+    labels = torch.Tensor(labels).type(torch.FloatTensor).to(device)
+
     # Recuperation des donnees
     x00tr, x01tr, x02tr, x10tr, x11tr, x12tr, x20tr, x21tr, x22tr = train_data 
 
     batches = torch.randperm(len(labels))
     # on split en batch de 64 puisque dataloader ne marche pas
     splitted = batches.split(64)
-    acc = tm.classification.BinaryAccuracy()
+    acc = tm.classification.BinaryAccuracy().to(device)
 
     for e in splitted:
         yhat = torch.Tensor([]).to(device)
@@ -304,7 +307,8 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
 		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
         
         yhats = torch.where(yhat > 0.5, 1, 0)
-        loss = loss_fn(yhat, labels[e])
+        #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
+        loss = loss_fn(torch.squeeze(yhat).type(torch.FloatTensor).to(device), labels[e])
         allLoss.append(loss.item())
         acc(yhats, labels[e])
               
@@ -317,16 +321,18 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
 
 
 def run(model, tdata, tlabels, optim, loss_fn = nn.BCELoss(), num_epoch = 100):
-    for epoch in tqdm(num_epoch):
+    for epoch in tqdm(np.arange(num_epoch)):
         trainloss, trainacc = train_epoch(tdata, tlabels, model,loss_fn, optim)
-        print(f'Loss train {trainloss} and accuracy {trainacc}')
+        print(f'\nLoss train {trainloss} and accuracy {trainacc}\n')
 
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 lr = 0.001
-model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,d5=2*32,d6=2*32,d7=2*32,d8=2*32,n_c=1)
+model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,d5=2*32,d6=2*32,d7=2*32,d8=2*32,n_c=1).to(device)
 optim = torch.optim.Adam(list(model.parameters()),lr = lr)
 optim.zero_grad()
 
+indata = (x0_0_tr[0], x0_1_tr[0], x0_2_tr[0], x1_0_tr[0], x1_1_tr[0], x1_2_tr[0], x2_0_tr[0], x2_1_tr[0], x2_2_tr[0])
+run(model, indata ,training_labels[0], optim)
 # print(len(training_labels[0]))
 # sur le fold 0
 
