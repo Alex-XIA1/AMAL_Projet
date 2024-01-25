@@ -47,10 +47,10 @@ X_test = X[test_mask!=0]
 Y = np.load(datapath+'targets.npy')
 last_nodes = np.load(datapath+'last_nodes.npy')
 y_tr = [list(np.squeeze(Y[np.where(train_mask!=0)])[i]) for i in range(len(Y[np.where(train_mask!=0)]))]
-y_tr_ = len(y_tr)*[1] # 6 for ocean
-# print('y_tr',len(y_tr))
-#print("Y",Y.shape)
-#print('y_tr',np.squeeze(y_tr[0]))
+y_tr_ = len(y_tr)*[1] # 6 for ocean 
+print('y_tr',len(y_tr))
+print("Y",Y.shape) # (200,6,1) means 200 trajectories, 6 classes, 1 or 0
+print('y_tr',np.squeeze(y_tr[0]))
 
 # convert binary list to class number for training, 6 classes for ocean
 for i in range(len(y_tr)): 
@@ -111,9 +111,6 @@ class Model_traj(nn.Module):
 
         self.D = nn.Sequential(nn.Linear(3*d5,d5),tanh,nn.Linear(d5,d5),tanh, nn.Linear(d5,d5),tanh, nn.Linear(d5,d6),softmax)
         
-        #self.xi0 = nn.Sequential(nn.Linear(d4,d4),tanh,nn.Linear(d4,d4),tanh, nn.Linear(d4,d4), tanh, nn.Linear(d4,d4),tanh)
-        #self.xi1 = nn.Sequential(nn.Linear(d4,d4),tanh,nn.Linear(d4,d4),tanh, nn.Linear(d4,d4), tanh, nn.Linear(d4,d4),tanh)
-        #self.xi2 = nn.Sequential(nn.Linear(d4,d4),tanh,nn.Linear(d4,d4),tanh, nn.Linear(d4,d4), tanh, nn.Linear(d4,d4),tanh)
         
 
     def forward(self, x1_0, x1_1, x1_2, B1, Z_):
@@ -122,14 +119,16 @@ class Model_traj(nn.Module):
         out1_2 = self.g1_1(x1_1) 
         out1_3 = self.g1_2(x1_2)
         
-        #aggregate the features of the nodes in the edge with the incidence matrix
+        #map the embeddings from the vector space of edge embeddings to the vector space of node embeddings
         xi_in0 = out1_1@B1.T  
         xi_in1 = out1_2@B1.T
         xi_in2 = out1_3@B1.T
         
-        #xi_out0 = self.xi0(xi_in0)
-        #xi_out1 = self.xi1(xi_in1)
-        #xi_out2 = self.xi1(xi_in2)
+        #xi_out0 = self.xi0(xi_in0)  # original code, but self.xi0 is not defined
+        #xi_out1 = self.xi1(xi_in1)  # original code, but self.xi1 is not defined
+        #xi_out2 = self.xi1(xi_in2)  # original code, but self.xi1 is not defined 
+        
+        
         xi_out0 = xi_in0
         xi_out1 = xi_in1
         xi_out2 = xi_in2
@@ -148,10 +147,18 @@ def main():
   N0 = (abs(B1@B1.T).shape)[0]
   N1 = (abs(B2@B2.T).shape)[0]
   N2 = (abs(B2.T@B2).shape)[0]
-  x1_0 = np.squeeze(X_tr)
-  x1_1 = x1_0@(B2@B2.T) + x1_0@(B1.T@B1) 
-  x1_2 = x1_1@(B2@B2.T) + x1_1@(B1.T@B1)
+  x1_0 = np.squeeze(X_tr)  # 1 simplexes
+  x1_1 = x1_0@(B2@B2.T) + x1_0@(B1.T@B1)  # simplexes Hodge Laplacian
+  x1_2 = x1_1@(B2@B2.T) + x1_1@(B1.T@B1)  # simplexes Hodge Laplacian
 
+  #print("N0",N0)
+  #print("N1",N1)
+  #print("N2",N2)
+  #print("x1_0",x1_0.shape)
+  #print("x1_1",x1_1.shape)
+  #print("x1_2",x1_2.shape)
+
+  
   Z_ = []     
   for l in range(len(last_nodes)):  
       i = last_nodes[l]
@@ -162,46 +169,58 @@ def main():
   Z_tr_ = Z_[train_mask!=0]
   Z_test = Z_[test_mask!=0]
 
+  #print("Z_",Z_.shape)
+  #print("Z_tr_",Z_tr_.shape)
+  #print("Z_tr_",Z_tr_[0])
+
+  
   
   indices_all = np.array(list(range(len(y_tr))))
   np.random.seed(1)
   kf = StratifiedKFold(n_splits=5) # 5 folder cross validation
   kf.get_n_splits(indices_all,y_tr)
+  
+  
+  
 
-  
-  
   model=network = Model_traj(d1=(X_tr.shape)[1],d2=(X_tr.shape)[1],d3=(X_tr.shape)[1],d4=(B1.shape)[0],d5=(B1.shape)[0],d6=6).to(device) #d6 = planar-17/mesh-7/ocean-6/syn-13
+ 
 
+  
   for train_index, test_index in kf.split(indices_all,y_tr):
-    learning_rate = 1e-5
+    learning_rate = 1e-3
     optimizer = torch.optim.Adam(network.parameters(), lr=learning_rate, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     
-    for i in range(0, 1500):
-      for j in range(0,len(indices_all)//8):  
+    for i in range(0, 15):
+      total_loss = 0
+      total_samples = 0
+      total_acc = 0
+      for j in range(0,len(indices_all)//10):  
             optimizer.zero_grad()	
-            indices = np.random.choice(train_index,8,replace=False) 
+            indices = np.random.choice(train_index,10,replace=False) 
             Z_tr = Z_tr_[indices]
             indices_val = test_index 
-            Z_val = Z_tr_[indices_val]
             x1_0_tr = x1_0[indices]
-            x1_0_val = x1_0[indices_val]
             x1_1_tr = x1_1[indices]
-            x1_1_val = x1_1[indices_val]
             x1_2_tr = x1_2[indices]
-            x1_2_val = x1_2[indices_val]
             ys = network(torch.Tensor(x1_0_tr).to(device),torch.Tensor(x1_1_tr).to(device),torch.Tensor(x1_2_tr).to(device),torch.Tensor(B1).to(device),torch.Tensor(Z_tr).to(device).type(torch.LongTensor))
             acc_tr = evaluate(ys.cpu(),(y_tr[indices]).type(torch.FloatTensor))
             loss = criterion(torch.squeeze(ys).type(torch.FloatTensor), (y_tr)[indices].type(torch.LongTensor))
+            total_loss += loss.item() * len(indices)
+            total_acc += acc_tr * len(indices)
+            total_samples += len(indices)
             loss.backward()
             optimizer.step()
             
-      
-      print ("-----------epoch = %d | training_loss = %f |"%(i,loss.item()))
+      average_loss = total_loss / total_samples
+      acc_tr = total_acc / total_samples
+      print ("-----------epoch = %d | training_loss = %f |"%(i,average_loss))
       print ("--------------------- | acc-tr =%f |"%(acc_tr.item()))
       network.eval()
-  
 
+      
+      
 
 if __name__ == '__main__':
   main()
