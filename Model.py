@@ -62,15 +62,15 @@ x2_0_tr = np.load(path+'/x2_0_tr_concat_.npy',allow_pickle=True)
 x2_1_tr = np.load(path+'/x2_1_tr_concat_.npy',allow_pickle=True)
 x2_2_tr = np.load(path+'/x2_2_tr_concat_.npy',allow_pickle=True)
 
-# x0_0_val = np.load(path+'/x0_0_val_concat_.npy',allow_pickle=True)
-# x0_1_val = np.load(path+'/x0_1_val_concat_.npy',allow_pickle=True)
-# x0_2_val = np.load(path+'/x0_2_val_concat_.npy',allow_pickle=True)
-# x1_0_val = np.load(path+'/x1_0_val_concat_.npy',allow_pickle=True)
-# x1_1_val = np.load(path+'/x1_1_val_concat_.npy',allow_pickle=True)
-# x1_2_val = np.load(path+'/x1_2_val_concat_.npy',allow_pickle=True)
-# x2_0_val = np.load(path+'/x2_0_val_concat_.npy',allow_pickle=True)
-# x2_1_val = np.load(path+'/x2_1_val_concat_.npy',allow_pickle=True)
-# x2_2_val = np.load(path+'/x2_2_val_concat_.npy',allow_pickle=True)
+x0_0_val = np.load(path+'/x0_0_val_concat_.npy',allow_pickle=True)
+x0_1_val = np.load(path+'/x0_1_val_concat_.npy',allow_pickle=True)
+x0_2_val = np.load(path+'/x0_2_val_concat_.npy',allow_pickle=True)
+x1_0_val = np.load(path+'/x1_0_val_concat_.npy',allow_pickle=True)
+x1_1_val = np.load(path+'/x1_1_val_concat_.npy',allow_pickle=True)
+x1_2_val = np.load(path+'/x1_2_val_concat_.npy',allow_pickle=True)
+x2_0_val = np.load(path+'/x2_0_val_concat_.npy',allow_pickle=True)
+x2_1_val = np.load(path+'/x2_1_val_concat_.npy',allow_pickle=True)
+x2_2_val = np.load(path+'/x2_2_val_concat_.npy',allow_pickle=True)
 
 # x0_0_test = np.load(path+'/x0_0_test_concat_.npy',allow_pickle=True)
 # x0_1_test = np.load(path+'/x0_1_test_concat_.npy',allow_pickle=True)
@@ -108,7 +108,7 @@ def testprecomputing(bk1,bk2,bk3,xk1,xk2,xk3):
 
     # dim Nk-1 
     #akb = bk1
-    # dim Nk-2 x Dk-1 <<<<<<<- PROBLEME DE DIMENSION : CRITIQUE A METTRE DANS LE POSTER
+    # dim Nk-2 x Dk-1 <<<<<<<- PROBLEME DE DIMENSION 
     #ykb = akb@xk1
 
     # dim Nk+1 x Nk
@@ -116,14 +116,14 @@ def testprecomputing(bk1,bk2,bk3,xk1,xk2,xk3):
     #akc = bk3
     #print(akc.shape)
     #print(xk3.shape)
-    # dim Nk+1 x Dk+1 <- probleme de dimension ENCORE <------ ICI AUSSI CEST UNE CRITIQUE
+    # dim Nk+1 x Dk+1 <- probleme de dimension ENCORE <------ ICI AUSSI ????
     ykc = akc@xk3
 
     #return np.concatenate((yku,ykl,ykb,ykc))
     return np.concatenate((yku,ykl,ykc))
 
 
-# matrice d'incidence en O((Nk-1 x Nk)**2)
+# matrice d'incidence en O((Nk-1 x Nk)**2) : polynomiale
 def makeIncidence(edges, threeclique):
     """
     edges : sommets networkx
@@ -178,7 +178,6 @@ class Model(nn.Module):
 
         #Un mlp tres basique
         self.D = nn.Sequential(nn.Linear(3*3*d3,d8),self.act,nn.Linear(d8,d8),self.act,nn.Linear(d8,d8),self.act,nn.Linear(d8,n_c),sortie()) #nn.Softmax(dim=0) for multi-class
-        self.dropout = nn.Dropout(0.00)
     
     def forward(self, x0_0, x0_1, x0_2, x1_0, x1_1, x1_2, x2_0, x2_1, x2_2):
         # Learning From simplicial aware features
@@ -228,27 +227,38 @@ undirected = G.to_undirected() # On passe en non oriente car l'article le fait c
 #plt.show()
 
 # Trouver toutes les 3-cliques (2-simplex) avec networkx
-# all_cliques= nx.enumerate_all_cliques(undirected)
-# triad_cliques=[x for x in all_cliques if len(x)==3 ]
+all_cliques= nx.enumerate_all_cliques(undirected)
+triad_cliques=[x for x in all_cliques if len(x)==3 ]
 #print(triad_cliques)
 
 # 2-clique = aretes
 
-# twoclique = undirected.edges()
+twoclique = undirected.edges()
 
-# oneclique = undirected.nodes()
+oneclique = undirected.nodes()
 #print(twoclique)
 
 # Matrice d'incidencee b1 (taille N0 x N1)
 #b1 = nx.incidence_matrix(undirected,oneclique,twoclique).todense()
+# on essaie de faire le calcul 
 
 # Matrice d'incidence b2 (taille N1 x N2)
+#print(x0_0_tr[0][0])
 #b2 = makeIncidence(twoclique,triad_cliques)
 
+#ak1 = b2@b2.T
+#ykl = ak1@x1_0_tr[0][0]
+
+# On ne retrouve pas les memes valeurs, ils ne disent pas tout dans l'article
+# print("nos valeurs pour les 3 premieres colonnes ",ykl[0])
+# print("les leurs ", x1_1_tr[0][0][0])
+
+#print(x1_1_tr[0][0][0])
+
 # On test pour k = 1
-# test = testprecomputing(None,b1,b2,x0_0_tr[0][0],x1_0_tr[0][0],x2_0_tr[0][0])
+#test = testprecomputing(None,b1,b2,x0_0_tr[0][0],x1_0_tr[0][0],x2_0_tr[0][0])
 
-
+# On ne peut pas utiliser de custom dataset 
 class CustomDset(Dataset):
     def __init__(self, x0_0, x0_1, x0_2, x1_0, x1_1, x1_2, x2_0, x2_1, x2_2, labels, transform=None, target_transform=None):
         self.x0_0 = x0_0
@@ -275,6 +285,7 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
     if device == None: 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     allLoss = []
+    model.train()
 
     labels = torch.Tensor(labels).type(torch.FloatTensor).to(device)
 
@@ -320,10 +331,55 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
     return np.array(allLoss).mean(), acc.compute().item()
 
 
-def run(model, tdata, tlabels, optim, loss_fn = nn.BCELoss(), num_epoch = 100):
+def valida_epoch(valid_data, labels, model, loss_fn, device = None, num_classes = 2):
+    if device == None: 
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.eval()
+    allLoss = []
+
+    labels = torch.Tensor(labels).type(torch.FloatTensor).to(device)
+
+    # Recuperation des donnees
+    x00tr, x01tr, x02tr, x10tr, x11tr, x12tr, x20tr, x21tr, x22tr = valid_data 
+
+    batches = torch.randperm(len(labels))
+    # on split en batch de 64 puisque dataloader ne marche pas
+    splitted = batches.split(64)
+    acc = tm.classification.BinaryAccuracy().to(device)
+
+    for e in splitted:
+        yhat = torch.Tensor([]).to(device)
+        # On doit recuperer pour un element du batch les Xk_t
+        for b in e:
+            x0_0 = x00tr[b]
+            x0_1 = x01tr[b]
+            x0_2 = x02tr[b]
+            x1_0 = x10tr[b]
+            x1_1 = x11tr[b]
+            x1_2 = x12tr[b]
+            x2_0 = x20tr[b]
+            x2_1 = x21tr[b]
+            x2_2 = x22tr[b]
+            # Predict de l'element du batch
+            yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
+		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+        
+        yhats = torch.where(yhat > 0.5, 1, 0)
+        #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
+        loss = loss_fn(torch.squeeze(yhat).type(torch.FloatTensor).to(device), labels[e])
+        allLoss.append(loss.item())
+        acc(yhats, labels[e])
+
+    return np.array(allLoss).mean(), acc.compute().item()
+
+def run(model, tdata, tlabels, vdata, val_labels, optim, loss_fn = nn.BCELoss(), num_epoch = 100):
     for epoch in tqdm(np.arange(num_epoch)):
         trainloss, trainacc = train_epoch(tdata, tlabels, model,loss_fn, optim)
+        validloss, validacc = valida_epoch(vdata,val_labels,model, loss_fn)
         print(f'\nLoss train {trainloss} and accuracy {trainacc}\n')
+        print(f'\nLoss validation {validloss} and accuracy {validacc}\n')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 lr = 0.001
@@ -331,9 +387,91 @@ model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,d5=2*32,d6=2*32,d7=2*32,d8=2*32,n_c=1
 optim = torch.optim.Adam(list(model.parameters()),lr = lr)
 optim.zero_grad()
 
-indata = (x0_0_tr[0], x0_1_tr[0], x0_2_tr[0], x1_0_tr[0], x1_1_tr[0], x1_2_tr[0], x2_0_tr[0], x2_1_tr[0], x2_2_tr[0])
-run(model, indata ,training_labels[0], optim)
-# print(len(training_labels[0]))
+"""
+On concatene toutes les donnees, ils avaient prevu une cross validation 10-folds 
+mais, ils ont deja split le dataset en 3 datasets (train, validation, test) donc on n'en a probablement pas besoin
+"""
+allx00tr = np.array([])
+for i in range(len(x0_0_tr)):
+    allx00tr = np.concatenate((allx00tr,x0_0_tr[i]))
+
+allx01tr = np.array([])
+for i in range(len(x0_1_tr)):
+    allx01tr = np.concatenate((allx01tr,x0_1_tr[i]))
+
+allx02tr = np.array([])
+for i in range(len(x0_2_tr)):
+    allx02tr = np.concatenate((allx02tr,x0_2_tr[i]))
+
+allx10tr = np.array([])
+for i in range(len(x1_0_tr)):
+    allx10tr = np.concatenate((allx10tr,x1_0_tr[i]))
+
+allx11tr = np.array([])
+for i in range(len(x1_1_tr)):
+    allx11tr = np.concatenate((allx11tr,x1_1_tr[i]))
+
+allx12tr = np.array([])
+for i in range(len(x1_2_tr)):
+    allx12tr = np.concatenate((allx12tr,x1_2_tr[i]))
+
+allx20tr = np.array([])
+for i in range(len(x2_0_tr)):
+    allx20tr = np.concatenate((allx20tr,x2_0_tr[i]))
+
+allx21tr = np.array([])
+for i in range(len(x2_1_tr)):
+    allx21tr = np.concatenate((allx21tr,x2_1_tr[i]))
+
+allx22tr = np.array([])
+for i in range(len(x2_2_tr)):
+    allx22tr = np.concatenate((allx22tr,x2_2_tr[i]))
+
+
+allx00val = np.array([])
+for i in range(len(x0_0_val)):
+    allx00val = np.concatenate((allx00val,x0_0_val[i]))
+
+allx01val = np.array([])
+for i in range(len(x0_1_val)):
+    allx01val = np.concatenate((allx01val,x0_1_val[i]))
+
+allx02val = np.array([])
+for i in range(len(x0_2_tr)):
+    allx02val = np.concatenate((allx02val,x0_2_val[i]))
+
+allx10val = np.array([])
+for i in range(len(x1_0_val)):
+    allx10val = np.concatenate((allx10val,x1_0_val[i]))
+
+allx11val = np.array([])
+for i in range(len(x1_1_val)):
+    allx11val = np.concatenate((allx11val,x1_1_val[i]))
+
+allx12val = np.array([])
+for i in range(len(x1_2_val)):
+    allx12val = np.concatenate((allx12val,x1_2_val[i]))
+
+allx20val = np.array([])
+for i in range(len(x2_0_val)):
+    allx20val = np.concatenate((allx20val,x2_0_val[i]))
+
+allx21val = np.array([])
+for i in range(len(x2_1_val)):
+    allx21val = np.concatenate((allx21val,x2_1_val[i]))
+
+allx22val = np.array([])
+for i in range(len(x2_2_tr)):
+    allx22val = np.concatenate((allx22val,x2_2_val[i]))
+
+# concatener
+# indata = (x0_0_tr[0], x0_1_tr[0], x0_2_tr[0], x1_0_tr[0], x1_1_tr[0], x1_2_tr[0], x2_0_tr[0], x2_1_tr[0], x2_2_tr[0])
+indata = (allx00tr, allx01tr, allx02tr, allx10tr, allx11tr, allx12tr, allx20tr, allx21tr, allx22tr)
+#valdata = (x0_0_val[0], x0_1_val[0], x0_2_val[0], x1_0_val[0], x1_1_val[0], x1_2_val[0], x2_0_val[0], x2_1_val[0], x2_2_val[0])
+valdata = (allx00val, allx01val, allx02val, allx10val, allx11val, allx12val, allx20val, allx21val, allx22val)
+run(model, indata ,training_labels[0], valdata, val_labels[0], optim)
+#print(len(training_labels[0]))
+
 # sur le fold 0
 
 # ATTENTION on ne peut pas faire de dataloader car les matrices d'incidences sont de dimensions differentes en plus padder les simplexes n'aurait pas de sens.
@@ -344,3 +482,5 @@ run(model, indata ,training_labels[0], optim)
 #     #args, y = args[:,:-1], args[:,-1]
 #     out = model(x0_0, x0_1, x0_2, x1_0, x1_1, x1_2, x2_0, x2_1, x2_2)
 #     break
+
+
