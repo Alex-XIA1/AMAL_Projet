@@ -85,6 +85,7 @@ x2_2_val = np.load(path+'/x2_2_val_concat_.npy',allow_pickle=True)
 
 # Essai de fonction precomputing
 
+# L'auteur de l'article retrouvee ! -> une video de presentation par lui meme : Simple Yet Powerful Graph-aware and Simplicial-aware Neural Models
 def testprecomputing(bk1,bk2,bk3,xk1,xk2,xk3):
     """
     bk1 : matrice incidence Nk-2 x Nk-1
@@ -108,19 +109,23 @@ def testprecomputing(bk1,bk2,bk3,xk1,xk2,xk3):
 
     # dim Nk-1 
     #akb = bk1
-    # dim Nk-2 x Dk-1 <<<<<<<- PROBLEME DE DIMENSION 
-    #ykb = akb@xk1
+    akb = bk2.T
+    # dim Nk-2 x Dk-1 <<<<<<<- PROBLEME DE DIMENSION -----> l'auteur a ecrit dans une video que A(k-1),b = Bk.T
+    # nouvelle dimension : Nk x Nk-1
+    ykb = akb@xk1
 
     # dim Nk+1 x Nk
-    akc = bk3.T
-    #akc = bk3
+    #akc = bk3.T
+    akc = bk3
     #print(akc.shape)
     #print(xk3.shape)
-    # dim Nk+1 x Dk+1 <- probleme de dimension ENCORE <------ ICI AUSSI ????
+    # dim Nk+1 x Dk+1 <- probleme de dimension ENCORE <------ ICI AUSSI ???? ---> A(k+1),c = Bk+1
+    # nouvelle dim : Nk x Nk+1
     ykc = akc@xk3
 
-    #return np.concatenate((yku,ykl,ykb,ykc))
-    return np.concatenate((yku,ykl,ykc))
+    print(yku.shape,ykl.shape,ykb.shape,ykc.shape)
+    return np.hstack((yku,ykl,ykb,ykc))
+    #return np.concatenate((yku,ykl,ykc))
 
 
 # matrice d'incidence en O((Nk-1 x Nk)**2) : polynomiale
@@ -153,6 +158,7 @@ class Model(nn.Module):
 
         self.act = activation()
 
+        # BLOC 1 du modele
         # Simplex de taille 0 (les sommets) pour t = 0,1,2
         # Critique : les dimensions ne correspondent pas a la formule donnee dans l'article, c'est pas regulier !
         # on peut verifier a partir des fichiers donnees
@@ -162,6 +168,7 @@ class Model(nn.Module):
         # 6 + 6 + ? + 3 = 15 + ? <- k = -1 c'est egal a 3 ? 
         self.g0_2 = nn.Sequential(nn.Linear(18,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
 
+        # BLOC 2 du modele
         # Simplex de taille 1 (les aretes) pour t = 0,1,2
         self.g1_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         # 3 + 3 + 3 + 3 = 12, c'est bon ici
@@ -169,6 +176,7 @@ class Model(nn.Module):
         # 12 + 12 + 6 + 9 = 39 -> c'est bon
         self.g1_2 = nn.Sequential(nn.Linear(39,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         
+        # BLOC 3 du modele
         # Simplex de taille 2 (les triangles) pour t = 0.1.2
         self.g2_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         # 3 + 3 + 3 + ? = 9 + ? <- k = K+1 est egal a 0 ?
@@ -239,12 +247,12 @@ oneclique = undirected.nodes()
 #print(twoclique)
 
 # Matrice d'incidencee b1 (taille N0 x N1)
-#b1 = nx.incidence_matrix(undirected,oneclique,twoclique).todense()
+b1 = nx.incidence_matrix(undirected,oneclique,twoclique).todense()
 # on essaie de faire le calcul 
 
 # Matrice d'incidence b2 (taille N1 x N2)
 #print(x0_0_tr[0][0])
-#b2 = makeIncidence(twoclique,triad_cliques)
+b2 = makeIncidence(twoclique,triad_cliques)
 
 #ak1 = b2@b2.T
 #ykl = ak1@x1_0_tr[0][0]
@@ -256,7 +264,10 @@ oneclique = undirected.nodes()
 #print(x1_1_tr[0][0][0])
 
 # On test pour k = 1
-#test = testprecomputing(None,b1,b2,x0_0_tr[0][0],x1_0_tr[0][0],x2_0_tr[0][0])
+newx11 = testprecomputing(None,b1,b2,x0_0_tr[0][0],x1_0_tr[0][0],x2_0_tr[0][0])
+# le precomputing ne redonne pas le meme resultat
+print("nos resultats ",newx11)
+print("leurs resultats ", x1_1_tr[0][0])
 
 # On ne peut pas utiliser de custom dataset 
 class CustomDset(Dataset):
@@ -391,85 +402,85 @@ optim.zero_grad()
 On concatene toutes les donnees, ils avaient prevu une cross validation 10-folds 
 mais, ils ont deja split le dataset en 3 datasets (train, validation, test) donc on n'en a probablement pas besoin
 """
-allx00tr = np.array([])
-for i in range(len(x0_0_tr)):
-    allx00tr = np.concatenate((allx00tr,x0_0_tr[i]))
+# allx00tr = np.array([])
+# for i in range(len(x0_0_tr)):
+#     allx00tr = np.concatenate((allx00tr,x0_0_tr[i]))
 
-allx01tr = np.array([])
-for i in range(len(x0_1_tr)):
-    allx01tr = np.concatenate((allx01tr,x0_1_tr[i]))
+# allx01tr = np.array([])
+# for i in range(len(x0_1_tr)):
+#     allx01tr = np.concatenate((allx01tr,x0_1_tr[i]))
 
-allx02tr = np.array([])
-for i in range(len(x0_2_tr)):
-    allx02tr = np.concatenate((allx02tr,x0_2_tr[i]))
+# allx02tr = np.array([])
+# for i in range(len(x0_2_tr)):
+#     allx02tr = np.concatenate((allx02tr,x0_2_tr[i]))
 
-allx10tr = np.array([])
-for i in range(len(x1_0_tr)):
-    allx10tr = np.concatenate((allx10tr,x1_0_tr[i]))
+# allx10tr = np.array([])
+# for i in range(len(x1_0_tr)):
+#     allx10tr = np.concatenate((allx10tr,x1_0_tr[i]))
 
-allx11tr = np.array([])
-for i in range(len(x1_1_tr)):
-    allx11tr = np.concatenate((allx11tr,x1_1_tr[i]))
+# allx11tr = np.array([])
+# for i in range(len(x1_1_tr)):
+#     allx11tr = np.concatenate((allx11tr,x1_1_tr[i]))
 
-allx12tr = np.array([])
-for i in range(len(x1_2_tr)):
-    allx12tr = np.concatenate((allx12tr,x1_2_tr[i]))
+# allx12tr = np.array([])
+# for i in range(len(x1_2_tr)):
+#     allx12tr = np.concatenate((allx12tr,x1_2_tr[i]))
 
-allx20tr = np.array([])
-for i in range(len(x2_0_tr)):
-    allx20tr = np.concatenate((allx20tr,x2_0_tr[i]))
+# allx20tr = np.array([])
+# for i in range(len(x2_0_tr)):
+#     allx20tr = np.concatenate((allx20tr,x2_0_tr[i]))
 
-allx21tr = np.array([])
-for i in range(len(x2_1_tr)):
-    allx21tr = np.concatenate((allx21tr,x2_1_tr[i]))
+# allx21tr = np.array([])
+# for i in range(len(x2_1_tr)):
+#     allx21tr = np.concatenate((allx21tr,x2_1_tr[i]))
 
-allx22tr = np.array([])
-for i in range(len(x2_2_tr)):
-    allx22tr = np.concatenate((allx22tr,x2_2_tr[i]))
+# allx22tr = np.array([])
+# for i in range(len(x2_2_tr)):
+#     allx22tr = np.concatenate((allx22tr,x2_2_tr[i]))
 
 
-allx00val = np.array([])
-for i in range(len(x0_0_val)):
-    allx00val = np.concatenate((allx00val,x0_0_val[i]))
+# allx00val = np.array([])
+# for i in range(len(x0_0_val)):
+#     allx00val = np.concatenate((allx00val,x0_0_val[i]))
 
-allx01val = np.array([])
-for i in range(len(x0_1_val)):
-    allx01val = np.concatenate((allx01val,x0_1_val[i]))
+# allx01val = np.array([])
+# for i in range(len(x0_1_val)):
+#     allx01val = np.concatenate((allx01val,x0_1_val[i]))
 
-allx02val = np.array([])
-for i in range(len(x0_2_tr)):
-    allx02val = np.concatenate((allx02val,x0_2_val[i]))
+# allx02val = np.array([])
+# for i in range(len(x0_2_tr)):
+#     allx02val = np.concatenate((allx02val,x0_2_val[i]))
 
-allx10val = np.array([])
-for i in range(len(x1_0_val)):
-    allx10val = np.concatenate((allx10val,x1_0_val[i]))
+# allx10val = np.array([])
+# for i in range(len(x1_0_val)):
+#     allx10val = np.concatenate((allx10val,x1_0_val[i]))
 
-allx11val = np.array([])
-for i in range(len(x1_1_val)):
-    allx11val = np.concatenate((allx11val,x1_1_val[i]))
+# allx11val = np.array([])
+# for i in range(len(x1_1_val)):
+#     allx11val = np.concatenate((allx11val,x1_1_val[i]))
 
-allx12val = np.array([])
-for i in range(len(x1_2_val)):
-    allx12val = np.concatenate((allx12val,x1_2_val[i]))
+# allx12val = np.array([])
+# for i in range(len(x1_2_val)):
+#     allx12val = np.concatenate((allx12val,x1_2_val[i]))
 
-allx20val = np.array([])
-for i in range(len(x2_0_val)):
-    allx20val = np.concatenate((allx20val,x2_0_val[i]))
+# allx20val = np.array([])
+# for i in range(len(x2_0_val)):
+#     allx20val = np.concatenate((allx20val,x2_0_val[i]))
 
-allx21val = np.array([])
-for i in range(len(x2_1_val)):
-    allx21val = np.concatenate((allx21val,x2_1_val[i]))
+# allx21val = np.array([])
+# for i in range(len(x2_1_val)):
+#     allx21val = np.concatenate((allx21val,x2_1_val[i]))
 
-allx22val = np.array([])
-for i in range(len(x2_2_tr)):
-    allx22val = np.concatenate((allx22val,x2_2_val[i]))
+# allx22val = np.array([])
+# for i in range(len(x2_2_tr)):
+#     allx22val = np.concatenate((allx22val,x2_2_val[i]))
 
 # concatener
 # indata = (x0_0_tr[0], x0_1_tr[0], x0_2_tr[0], x1_0_tr[0], x1_1_tr[0], x1_2_tr[0], x2_0_tr[0], x2_1_tr[0], x2_2_tr[0])
-indata = (allx00tr, allx01tr, allx02tr, allx10tr, allx11tr, allx12tr, allx20tr, allx21tr, allx22tr)
-#valdata = (x0_0_val[0], x0_1_val[0], x0_2_val[0], x1_0_val[0], x1_1_val[0], x1_2_val[0], x2_0_val[0], x2_1_val[0], x2_2_val[0])
-valdata = (allx00val, allx01val, allx02val, allx10val, allx11val, allx12val, allx20val, allx21val, allx22val)
-run(model, indata ,training_labels[0], valdata, val_labels[0], optim)
+# indata = (allx00tr, allx01tr, allx02tr, allx10tr, allx11tr, allx12tr, allx20tr, allx21tr, allx22tr)
+# #valdata = (x0_0_val[0], x0_1_val[0], x0_2_val[0], x1_0_val[0], x1_1_val[0], x1_2_val[0], x2_0_val[0], x2_1_val[0], x2_2_val[0])
+# valdata = (allx00val, allx01val, allx02val, allx10val, allx11val, allx12val, allx20val, allx21val, allx22val)
+# run(model, indata ,training_labels[0], valdata, val_labels[0], optim)
 #print(len(training_labels[0]))
 
 # sur le fold 0
