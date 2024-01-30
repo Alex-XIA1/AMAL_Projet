@@ -30,11 +30,8 @@ import torchmetrics as tm
 from tqdm import notebook, tqdm
 from sklearn.metrics import RocCurveDisplay, roc_curve
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-<<<<<<< HEAD
 from sklearn.metrics import roc_auc_score, auc
 from sklearn.metrics import PrecisionRecallDisplay, precision_recall_curve, average_precision_score
-=======
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
 
 """
 Cette version utilise les donnees fournies par les auteurs, les matrices d'incidences sont normalisees ce qui donne de la stabilité. Cependant,
@@ -442,22 +439,15 @@ def test_valide(valid_data, labels, model, loss_fn, device = None, num_classes =
     acc(yhats, labels)
 
     fpr, tpr, _ = roc_curve(torch.Tensor(labels).type(torch.FloatTensor), torch.squeeze(yhat).type(torch.FloatTensor).detach().numpy())
-<<<<<<< HEAD
     aucscore = auc(fpr,tpr)
 
     prec, recall, _ = precision_recall_curve(torch.Tensor(labels).type(torch.FloatTensor), torch.squeeze(yhat).type(torch.FloatTensor).detach().numpy())
     pr_ap = average_precision_score(torch.Tensor(labels).type(torch.FloatTensor), torch.squeeze(yhat).type(torch.FloatTensor).detach().numpy())
-=======
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
 
     cm = confusion_matrix(torch.Tensor(yhats).type(torch.FloatTensor), torch.Tensor(labels).type(torch.FloatTensor))
     #print(cm)
 
-<<<<<<< HEAD
     return loss.item(), acc.compute().item(), fpr, tpr, cm, aucscore, prec, recall, pr_ap
-=======
-    return loss.item(), acc.compute().item(), fpr, tpr, cm 
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
 
 
 def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, loss_fn = nn.BCELoss(), num_epoch = 100):
@@ -475,17 +465,10 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
         epochtrainperfs.append(trainacc)
         epochvalidperfs.append(validacc)
     
-<<<<<<< HEAD
     testloss, testacc, fpr, tpr, cm, aucscore, precision, recall, pr_ap = test_valide(testdata, testlabels, model, loss_fn)
 
     print(f'The final loss for test is {testloss} its accuracy is {testacc}')
     # toutes les performances et loss pour train et validation
-=======
-    testloss, testacc, fpr, tpr, cm = test_valide(testdata, testlabels, model, loss_fn)
-
-    print(f'The final loss for test is {testloss} its accuracy is {testacc}')
-
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
     plt.subplot(2,2,1)
     plt.plot(np.array(epochtrainloss))
     plt.title("loss train")
@@ -513,7 +496,6 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     plt.tight_layout()
     plt.show()
 
-<<<<<<< HEAD
     # ROC AUC image
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
     roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr, estimator_name=f'ROC (AUC = {np.round(aucscore,2)})')
@@ -526,12 +508,6 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     plt.show()
 
     # matrice de confusion test
-=======
-    roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr).plot()
-    plt.title("courbe roc pour les tests")
-    plt.show()
-
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
     disp = ConfusionMatrixDisplay(confusion_matrix=cm).plot()
     plt.title("Matrice de confusion test")
     plt.show()
@@ -663,13 +639,9 @@ alllabstest = np.array([])
 allx22test = np.array([])
 for i in range(limit):
     allx22test = np.concatenate((allx22test,x2_2_test[i]))
-<<<<<<< HEAD
     # fold x 1 x datasize
     alllabstest = np.hstack((alllabstest,testing_labels[i][0]))
 
-=======
-    alllabstest = np.hstack((alllabstest,testing_labels[0][i]))
->>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
 
 # print(alllabstr.shape)
 # print(alllabstest.shape)
