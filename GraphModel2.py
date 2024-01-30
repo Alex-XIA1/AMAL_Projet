@@ -532,4 +532,8 @@ testentry = (testdata, testdatahop1)
 
 run(model, trainentry ,training_labels[0], valentry, val_labels[0], testentry, testing_labels[0][0], optim)
 
+<<<<<<< HEAD
 # The final loss for test is 0.4913697838783264 its accuracy is 0.7477477192878723
+=======
+# The final loss for test is 0.47761714458465576 +- 0.03 its accuracy is 0.7837837934494019 +- 0.02
+>>>>>>> 38f5a2656653dd545b693fa89c854dc99a38d9a4
