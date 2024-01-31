@@ -23,21 +23,23 @@ from sklearn.model_selection import StratifiedKFold
 import networkx as nx
 from torch.utils.data import Dataset, DataLoader
 
+
+###################################################### Data Loading and Preprocessing ######################################################
 class TrajectoryDataset(Dataset):
     def __init__(self, X, Y, Z, B1, B2, mask):
         self.X = X[mask != 0]
         self.Y = Y[mask != 0]
         self.Z = Z[mask != 0]
-        self.B1 = B1
-        self.B2 = B2
+        self.B1 = B1 # matrix of incidence of edges and nodes
+        self.B2 = B2 # matrix of incidence of edges and edges
 
     def __len__(self):
         return len(self.Y)
 
     def __getitem__(self, idx):
-        x1_0 = np.squeeze(self.X[idx])
-        x1_1 = x1_0@(self.B2@self.B2.T) + x1_0@(self.B1.T@self.B1)
-        x1_2 = x1_1@(self.B2@self.B2.T) + x1_1@(self.B1.T@self.B1)
+        x1_0 = np.squeeze(self.X[idx]) # 0-simplices
+        x1_1 = x1_0@(self.B2@self.B2.T) + x1_0@(self.B1.T@self.B1) # 1-simplices
+        x1_2 = x1_1@(self.B2@self.B2.T) + x1_1@(self.B1.T@self.B1) # 2-simplices
         y = self.Y[idx]
         z = self.Z[idx]
 
@@ -64,6 +66,9 @@ class TrajectoryDataset(Dataset):
         elif np.array_equal(binary_list, [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]): return 5
         else: return -1  # Or any other default/error value
 
+
+
+###################################################### Model Definition ######################################################
 class Model_traj(nn.Module):
     def __init__(self,d1,d2,d3,d4,d5,d6):
         super(Model_traj,self).__init__()
@@ -91,9 +96,9 @@ class Model_traj(nn.Module):
         out1_3 = self.g1_2(x1_2)
         
         #map the embeddings from the vector space of edge embeddings to the vector space of node embeddings
-        xi_in0 = out1_1@B1.T  
-        xi_in1 = out1_2@B1.T
-        xi_in2 = out1_3@B1.T
+        xi_in0 = out1_1@B1.T 
+        xi_in1 = out1_2@B1.T 
+        #xi_in2 = out1_3@B1.T
         
         
         
@@ -105,6 +110,7 @@ class Model_traj(nn.Module):
         final_out = self.D(xi_out.to(device))     				       
         return final_out
 
+###################################################### Training and Evaluation ######################################################
 # Training Function
 def train(model, dataloader, criterion, optimizer, device):
     model.train()
@@ -155,8 +161,6 @@ def main():
     B1 = np.load(datapath + 'B1.npy')
     B2 = np.load(datapath+'B2.npy')
     train_mask = np.load(datapath + 'train_mask.npy')
-
-
 
     # Create Dataset and DataLoader
     dataset = TrajectoryDataset(X, Y, Z_, B1, B2, train_mask)
