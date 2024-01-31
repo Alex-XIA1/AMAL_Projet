@@ -177,45 +177,36 @@ class Model(nn.Module):
         self.g0_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         # g0_1 doit prendre en entree une dimension superieure a 6 !
         self.g0_1 = nn.Sequential(nn.Linear(6,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 6 + 6 + ? + 3 = 15 + ? <- k = -1 c'est egal a 3 ? 
-        self.g0_2 = nn.Sequential(nn.Linear(18,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
 
         # BLOC 2 du modele
         # Simplex de taille 1 (les aretes) pour t = 0,1,2
         self.g1_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         # 3 + 3 + 3 + 3 = 12, c'est bon ici
         self.g1_1 = nn.Sequential(nn.Linear(12,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 12 + 12 + 6 + 9 = 39 -> c'est bon
-        self.g1_2 = nn.Sequential(nn.Linear(39,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
+
         
         # BLOC 3 du modele
         # Simplex de taille 2 (les triangles) pour t = 0.1.2
         self.g2_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
         # 3 + 3 + 3 + ? = 9 + ? <- k = K+1 est egal a 0 ?
         self.g2_1 = nn.Sequential(nn.Linear(9,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 9 + 9 + 12 + ? = 30 + ? <- 0 aussi ?
-        self.g2_2 = nn.Sequential(nn.Linear(30,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
 
         #Un mlp tres basique
-        self.D = nn.Sequential(nn.Linear(3*3*d3,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,n_c),sortie()) #nn.Softmax(dim=0) for multi-class
+        self.D = nn.Sequential(nn.Linear(2*3*d3,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,n_c),sortie()) #nn.Softmax(dim=0) for multi-class
     
-    def forward(self, x0_0, x0_1, x0_2, x1_0, x1_1, x1_2, x2_0, x2_1, x2_2):
+    def forward(self, x0_0, x0_1, x1_0, x1_1, x2_0, x2_1):
         # Learning From simplicial aware features
         # gt_k, t =0,1,2 et k = 0,1,2
         out0_1 = self.g0_0(x0_0) 
         out0_2 = self.g0_1(x0_1)
-        out0_3 = self.g0_2(x0_2) 
         out1_1 = self.g1_0(x1_0) 
         out1_2 = self.g1_1(x1_1) 
-        out1_3 = self.g1_2(x1_2)
         out2_1 = self.g2_0(x2_0) 
         out2_2 = self.g2_1(x2_1) 
-        out2_3 = self.g2_2(x2_2)
-        
         # On calcul H(k) qui correspond a la concatenation de chaque t-hop pour un k donne
-        xi_in0 = torch.cat((torch.sum((out0_1),0),torch.sum((out0_2),0),torch.sum((out0_3),0)),0)
-        xi_in1 = torch.cat((torch.sum((out1_1),0),torch.sum((out1_2),0),torch.sum((out1_3),0)),0)
-        xi_in2 = torch.cat((torch.sum((out2_1),0),torch.sum((out2_2),0),torch.sum((out2_3),0)),0)
+        xi_in0 = torch.cat((torch.sum((out0_1),0),torch.sum((out0_2),0)),0)
+        xi_in1 = torch.cat((torch.sum((out1_1),0),torch.sum((out1_2),0)),0)
+        xi_in2 = torch.cat((torch.sum((out2_1),0),torch.sum((out2_2),0)),0)
 
         # La concatenation finale de tous les blocs "attention" avant le passage dans le MLP.
         phi_in = torch.cat(((xi_in0),(xi_in1),(xi_in2)))
@@ -327,19 +318,13 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
         for b in e:
             x0_0 = x00tr[b]
             x0_1 = x01tr[b]
-            x0_2 = x02tr[b]
             x1_0 = x10tr[b]
             x1_1 = x11tr[b]
-            x1_2 = x12tr[b]
             x2_0 = x20tr[b]
             x2_1 = x21tr[b]
-            x2_2 = x22tr[b]
             optim.zero_grad()
             # Predict de l'element du batch
-            yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+            yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device))), 0)
         
         yhats = torch.where(yhat > 0.5, 1, 0)
         #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -377,18 +362,13 @@ def valida_epoch(valid_data, labels, model, loss_fn, device = None, num_classes 
         for b in e:
             x0_0 = x00tr[b]
             x0_1 = x01tr[b]
-            x0_2 = x02tr[b]
             x1_0 = x10tr[b]
             x1_1 = x11tr[b]
-            x1_2 = x12tr[b]
             x2_0 = x20tr[b]
             x2_1 = x21tr[b]
-            x2_2 = x22tr[b]
             # Predict de l'element du batch
             yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+		  	torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device))), 0)
         
         yhats = torch.where(yhat > 0.5, 1, 0)
         #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -422,18 +402,14 @@ def test_valide(valid_data, labels, model, loss_fn, device = None, num_classes =
         # On doit recuperer pour un element du batch les Xk_t
         x0_0 = x00tr[i]
         x0_1 = x01tr[i]
-        x0_2 = x02tr[i]
         x1_0 = x10tr[i]
         x1_1 = x11tr[i]
-        x1_2 = x12tr[i]
         x2_0 = x20tr[i]
         x2_1 = x21tr[i]
-        x2_2 = x22tr[i]
         # Predict de l'element du batch
         yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+		  	torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device))), 0)
         
     yhats = torch.where(yhat > 0.5, 1, 0)
     #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -452,7 +428,7 @@ def test_valide(valid_data, labels, model, loss_fn, device = None, num_classes =
     return loss.item(), acc.compute().item(), fpr, tpr, cm, aucscore, prec, recall, pr_ap
 
 
-def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, loss_fn = nn.BCELoss(), num_epoch = 300):
+def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, loss_fn = nn.BCELoss(), num_epoch = 100):
     epochtrainloss = []
     epochtrainperfs = []
     epochvalidloss = []
@@ -472,8 +448,7 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     path = './img/graphclassif/'
 
     print(f'The final loss for test is {testloss} its accuracy is {testacc}')
-    #The final loss for test is 0.3034552335739136 its accuracy is 0.8835821151733398 for 128*128
-    # The final loss for test is 0.27934539318084717 its accuracy is 0.8865671753883362 for 64 * 64
+    # The final loss for test is 0.3697027564048767 its accuracy is 0.8716418147087097
     # toutes les performances et loss pour train et validation
     plt.subplot(2,2,1)
     plt.plot(np.array(epochtrainloss))
@@ -500,7 +475,7 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     plt.ylabel("performances")
 
     plt.tight_layout()
-    plt.savefig(f'{path}{num_epoch}_model_{date}.pdf')
+    plt.savefig(f'{path}{num_epoch}_model3_{date}.pdf')
     #plt.show()
 
     # ROC AUC image
@@ -512,19 +487,18 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     pr_display.plot(ax=ax2)
     ax1.set_title("Courbe ROC sur données test")
     ax2.set_title("Courbe PR sur données test")
-    plt.savefig(f'{path}{num_epoch}_model_ROC_{date}.pdf')
+    plt.savefig(f'{path}{num_epoch}_model3_ROC_{date}.pdf')
     #plt.show()
 
     # matrice de confusion test
     disp = ConfusionMatrixDisplay(confusion_matrix=cm).plot()
     plt.title("Matrice de confusion test")
-    plt.savefig(f'{path}{num_epoch}_model_cm_{date}.pdf')
+    plt.savefig(f'{path}{num_epoch}_model3_cm_{date}.pdf')
     #plt.show()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 lr = 0.001
-dimin = 32
-model = Model(d1=3,d2=2*dimin,d3=2*dimin,d4=2*dimin,n_c=1).to(device)
+model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,n_c=1).to(device)
 optim = torch.optim.Adam(list(model.parameters()),lr = lr)
 optim.zero_grad()
 

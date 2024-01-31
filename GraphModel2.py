@@ -32,6 +32,8 @@ from sklearn.metrics import RocCurveDisplay, roc_curve
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_auc_score, auc
 from sklearn.metrics import PrecisionRecallDisplay, precision_recall_curve, average_precision_score
+from datetime import datetime
+from datetime import date
 
 """
 
@@ -427,6 +429,8 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels , optim, 
     testloss, testacc, fpr, tpr, cm, aucscore, precision, recall, pr_ap  = test_valide(testdata, testlabels, model, loss_fn)
 
     print(f'The final loss for test is {testloss} its accuracy is {testacc}')
+    date = datetime.today().strftime('%Y-%m-%d_%H:%M:%S')
+    path = './img/graphclassif/'
 
     plt.subplot(2,2,1)
     plt.plot(np.array(epochtrainloss))
@@ -453,7 +457,8 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels , optim, 
     plt.ylabel("performances")
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f'{path}{num_epoch}_model2_acc_{date}.pdf')
+    #plt.show()
 
     # ROC AUC image
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
@@ -464,11 +469,13 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels , optim, 
     pr_display.plot(ax=ax2)
     ax1.set_title("Courbe ROC sur données test")
     ax2.set_title("Courbe PR sur données test")
-    plt.show()
+    plt.savefig(f'{path}{num_epoch}_model2_ROC_{date}.pdf')
+    #plt.show()
 
     disp = ConfusionMatrixDisplay(confusion_matrix=cm).plot()
     plt.title("Matrice de confusion test")
-    plt.show()
+    plt.savefig(f'{path}{num_epoch}_model2_cm_{date}.pdf')
+    #plt.show()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 lr = 0.001
