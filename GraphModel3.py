@@ -496,136 +496,119 @@ def run(model, tdata, tlabels, vdata, val_labels, testdata, testlabels, optim, l
     plt.savefig(f'{path}{num_epoch}_model3_cm_{date}.pdf')
     #plt.show()
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-lr = 0.001
-model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,n_c=1).to(device)
-optim = torch.optim.Adam(list(model.parameters()),lr = lr)
-optim.zero_grad()
+def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels , loss_fn = nn.BCELoss(), num_epoch = 150):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    foldtrainloss = []
+    foldtrainperfs = []
+    foldvalloss = []
+    foldvalperfs = []
+    foldtestperfs = []
+    foldtestloss = []
+    foldtpr = []
+    x00_tr, x01_tr, x02_tr, x10_tr, x11_tr, x12_tr, x20_tr, x21_tr, x22_tr = tdata
+    x00_val, x01_val, x02_val, x10_val, x11_val, x12_val, x20_val, x21_val, x22_val = vdata
+    x00_test, x01_test, x02_test, x10_test, x11_test, x12_test, x20_test, x21_test, x22_test = testdata
+    # le fpr au milieu
+    mean_fpr = np.linspace(0, 1, 100)
 
-"""
-On concatene toutes les donnees, ils avaient prevu une cross validation 10-folds 
-mais, ils ont deja split le dataset en 3 datasets (train, validation, test) donc on n'en a probablement pas besoin
-"""
+    for fold in range(len(x00_tr)):
+        print(f'fold {fold+1}')
 
-limit = 3
-allx00tr = np.array([])
-for i in range(limit):
-    allx00tr = np.concatenate((allx00tr,x0_0_tr[i]))
+        lr = 0.001
+        dimin = 32
+        model = Model(d1=3,d2=2*dimin,d3=2*dimin,d4=2*dimin,n_c=1).to(device)
+        optim = torch.optim.Adam(list(model.parameters()),lr = lr)
+        optim.zero_grad()
+        
+        epochtrainloss = []
+        epochtrainperfs = []
+        epochvalidloss = []
+        epochvalidperfs = []
+        epochtrainloss = []
+        epochtrainperfs = []
+        epochvalidloss = []
+        epochvalidperfs = []
+        
+        trainf = (x00_tr[fold], x01_tr[fold], x02_tr[fold], x10_tr[fold], x11_tr[fold], x12_tr[fold], x20_tr[fold], x21_tr[fold], x22_tr[fold])
+        valf = (x00_val[fold], x01_val[fold], x02_val[fold], x10_val[fold], x11_val[fold], x12_val[fold], x20_val[fold], x21_val[fold], x22_val[fold])
+        testf = (x00_test[fold], x01_test[fold], x02_test[fold], x10_test[fold], x11_test[fold], x12_test[fold], x20_test[fold], x21_test[fold], x22_test[fold])
+        for epoch in tqdm(np.arange(num_epoch)):
+            trainloss, trainacc = train_epoch(trainf, tlabels[fold], model,loss_fn, optim)
+            validloss, validacc = valida_epoch(valf,val_labels[fold],model, loss_fn)
+            print(f'\nLoss train {trainloss} and accuracy {trainacc}\n')
+            print(f'\nLoss validation {validloss} and accuracy {validacc}\n')
+            epochtrainloss.append(trainloss)
+            epochvalidloss.append(validloss)
+            epochtrainperfs.append(trainacc)
+            epochvalidperfs.append(validacc)
+        
+        
+        testloss, testacc, fpr, tpr, cm, aucscore, precision, recall, pr_ap = test_valide(testf, testlabels[fold][0], model, loss_fn)
+        # test
+        foldtestperfs.append(testacc)
+        foldtestloss.append(testloss)
+        # fold loss de train
+        foldtrainloss.append(epochtrainloss)
+        foldtrainperfs.append(epochtrainperfs)
+        # validation
+        foldvalloss.append(epochvalidloss)
+        foldvalperfs.append(epochvalidperfs)
 
-allx01tr = np.array([])
-for i in range(limit):
-    allx01tr = np.concatenate((allx01tr,x0_1_tr[i]))
+        plt.plot(fpr, tpr, 'b', alpha=0.15)
+        tpr = np.interp(mean_fpr, fpr, tpr)
+        tpr[0] = 0.0
+        foldtpr.append(tpr)
+    foldtpr = np.array(foldtpr)
+    mean_tprs = foldtpr.mean(axis=0)
+    mean_tprs[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tprs)
+    
+    date = datetime.today().strftime('%Y-%m-%d_%H:%M:%S')
+    path = './img/graphclassif/'
 
-allx02tr = np.array([])
-for i in range(limit):
-    allx02tr = np.concatenate((allx02tr,x0_2_tr[i]))
+    print(f'The final loss for test is {np.mean(foldtestloss)} its accuracy is {np.mean(foldtestperfs)}')
+    # toutes les performances et loss pour train et validation
+    # ROC AUC image
+    plt.plot(mean_fpr,mean_tprs,'b',label=f'Mean ROC (AUC = {np.round(mean_auc,2)})')
+    plt.xlabel("False positive rate")
+    plt.ylabel("True positive rate")
+    plt.legend()
+    plt.savefig(f'{path}{num_epoch}_modelfold_ROC_{date}.pdf')
+    
+    plt.subplot(2,2,1)
+    plt.plot(np.array(np.mean(foldtrainloss,axis=0)))
+    plt.title("loss train")
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+    
+    plt.subplot(2,2,2)
+    plt.plot(np.array(np.mean(foldtrainperfs,axis=0)))
+    plt.title("performances train")
+    plt.xlabel("epoch")
+    plt.ylabel("performances")
+    
+    plt.subplot(2,2,3)
+    plt.plot(np.array(np.mean(foldvalloss,axis=0)))
+    plt.title("loss validation")
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
 
-allx10tr = np.array([])
-for i in range(limit):
-    allx10tr = np.concatenate((allx10tr,x1_0_tr[i]))
+    plt.subplot(2,2,4)
+    plt.plot(np.array(np.mean(foldvalperfs,axis=0)))
+    plt.title("performances validation")
+    plt.xlabel("epoch")
+    plt.ylabel("performances")
 
-allx11tr = np.array([])
-for i in range(limit):
-    allx11tr = np.concatenate((allx11tr,x1_1_tr[i]))
-
-allx12tr = np.array([])
-for i in range(limit):
-    allx12tr = np.concatenate((allx12tr,x1_2_tr[i]))
-
-allx20tr = np.array([])
-for i in range(limit):
-    allx20tr = np.concatenate((allx20tr,x2_0_tr[i]))
-
-allx21tr = np.array([])
-for i in range(limit):
-    allx21tr = np.concatenate((allx21tr,x2_1_tr[i]))
+    plt.tight_layout()
+    plt.savefig(f'{path}{num_epoch}_modelfold_{date}.pdf')
+    #plt.show()
 
 
-alllabstr = np.array([])
-allx22tr = np.array([])
-for i in range(limit):
-    allx22tr = np.concatenate((allx22tr,x2_2_tr[i]))
-    alllabstr = np.hstack((alllabstr,training_labels[i]))
-
-# validations
-allx00val = np.array([])
-for i in range(limit):
-    allx00val = np.concatenate((allx00val,x0_0_val[i]))
-
-allx01val = np.array([])
-for i in range(limit):
-    allx01val = np.concatenate((allx01val,x0_1_val[i]))
-
-allx02val = np.array([])
-for i in range(limit):
-    allx02val = np.concatenate((allx02val,x0_2_val[i]))
-
-allx10val = np.array([])
-for i in range(limit):
-    allx10val = np.concatenate((allx10val,x1_0_val[i]))
-
-allx11val = np.array([])
-for i in range(limit):
-    allx11val = np.concatenate((allx11val,x1_1_val[i]))
-
-allx12val = np.array([])
-for i in range(limit):
-    allx12val = np.concatenate((allx12val,x1_2_val[i]))
-
-allx20val = np.array([])
-for i in range(limit):
-    allx20val = np.concatenate((allx20val,x2_0_val[i]))
-
-allx21val = np.array([])
-for i in range(limit):
-    allx21val = np.concatenate((allx21val,x2_1_val[i]))
-
-alllabsval = np.array([])
-allx22val = np.array([])
-for i in range(limit):
-    allx22val = np.concatenate((allx22val,x2_2_val[i]))
-    alllabsval = np.hstack((alllabsval,val_labels[i]))
-
-# tests
-allx00test = np.array([])
-for i in range(limit):
-    allx00test = np.concatenate((allx00test,x0_0_test[i]))
-
-allx01test = np.array([])
-for i in range(limit):
-    allx01test = np.concatenate((allx01test,x0_1_test[i]))
-
-allx02test = np.array([])
-for i in range(limit):
-    allx02test = np.concatenate((allx02test,x0_2_test[i]))
-
-allx10test = np.array([])
-for i in range(limit):
-    allx10test = np.concatenate((allx10test,x1_0_test[i]))
-
-allx11test = np.array([])
-for i in range(limit):
-    allx11test = np.concatenate((allx11test,x1_1_test[i]))
-
-allx12test = np.array([])
-for i in range(limit):
-    allx12test = np.concatenate((allx12test,x1_2_test[i]))
-
-allx20test = np.array([])
-for i in range(limit):
-    allx20test = np.concatenate((allx20test,x2_0_test[i]))
-
-allx21test = np.array([])
-for i in range(limit):
-    allx21test = np.concatenate((allx21test,x2_1_test[i]))
-
-alllabstest = np.array([])
-allx22test = np.array([])
-for i in range(limit):
-    allx22test = np.concatenate((allx22test,x2_2_test[i]))
-    # fold x 1 x datasize
-    alllabstest = np.hstack((alllabstest,testing_labels[i][0]))
-
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# lr = 0.001
+# model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,n_c=1).to(device)
+# optim = torch.optim.Adam(list(model.parameters()),lr = lr)
+# optim.zero_grad()
 
 # print(alllabstr.shape)
 # print(alllabstest.shape)
@@ -635,11 +618,13 @@ for i in range(limit):
 # nik, ij -> nik 
 # concatener
 #indata = (x0_0_tr[0], x0_1_tr[0], x0_2_tr[0], x1_0_tr[0], x1_1_tr[0], x1_2_tr[0], x2_0_tr[0], x2_1_tr[0], x2_2_tr[0])
-indata = (allx00tr, allx01tr, allx02tr, allx10tr, allx11tr, allx12tr, allx20tr, allx21tr, allx22tr)
 #valdata = (x0_0_val[0], x0_1_val[0], x0_2_val[0], x1_0_val[0], x1_1_val[0], x1_2_val[0], x2_0_val[0], x2_1_val[0], x2_2_val[0])
-valdata = (allx00val, allx01val, allx02val, allx10val, allx11val, allx12val, allx20val, allx21val, allx22val)
-testdata = (allx00test, allx01test, allx02test, allx10test, allx11test, allx12test, allx20test, allx21test, allx22test)
-run(model, indata ,alllabstr, valdata, alllabsval, testdata, alllabstest, optim)
+
+indata = (x0_0_tr, x0_1_tr, x0_2_tr, x1_0_tr, x1_1_tr, x1_2_tr, x2_0_tr, x2_1_tr, x2_2_tr)
+valdata = (x0_0_val, x0_1_val, x0_2_val, x1_0_val, x1_1_val, x1_2_val, x2_0_val, x2_1_val, x2_2_val)
+testdata = (x0_0_test, x0_1_test, x0_2_test, x1_0_test, x1_1_test, x1_2_test, x2_0_test, x2_1_test, x2_2_test)
+
+runCrossVal(indata ,training_labels, valdata, val_labels, testdata, testing_labels)
 #print(len(training_labels[0]))
 
 # sur le fold 0
