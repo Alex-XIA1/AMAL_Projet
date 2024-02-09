@@ -565,8 +565,8 @@ def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels , loss_f
     
     date = datetime.today().strftime('%Y-%m-%d_%H:%M:%S')
     path = './img/graphclassif/'
-
-    print(f'The final loss for test is {np.mean(foldtestloss)} its accuracy is {np.mean(foldtestperfs)}')
+    print(f'The final loss for test is {np.mean(foldtestloss)} its accuracy is {np.mean(foldtestperfs)} (std = {np.std(foldtestperfs)})')
+    # The final loss for test is 0.5707865476608276 its accuracy is 0.75563063621521 (std = 0.03838845008377538)
     # toutes les performances et loss pour train et validation
     # ROC AUC image
     plt.plot(mean_fpr,mean_tprs,'b',label=f'Mean ROC (AUC = {np.round(mean_auc,2)})')

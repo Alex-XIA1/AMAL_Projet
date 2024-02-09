@@ -212,12 +212,14 @@ class Model(nn.Module):
         out2_2 = self.g2_1(x2_1) 
         out2_3 = self.g2_2(x2_2)
         
-        # On calcul H(k) qui correspond a la concatenation de chaque t-hop pour un k donne
+        # On calcul H(k) qui correspond a la concatenation de chaque t-hop pour un k donne et en sommant les informations du simplexe
+        # dim3 * 3 ici
         xi_in0 = torch.cat((torch.sum((out0_1),0),torch.sum((out0_2),0),torch.sum((out0_3),0)),0)
         xi_in1 = torch.cat((torch.sum((out1_1),0),torch.sum((out1_2),0),torch.sum((out1_3),0)),0)
         xi_in2 = torch.cat((torch.sum((out2_1),0),torch.sum((out2_2),0),torch.sum((out2_3),0)),0)
 
         # La concatenation finale de tous les blocs "attention" avant le passage dans le MLP.
+        # dim3 * 3 * 3
         phi_in = torch.cat(((xi_in0),(xi_in1),(xi_in2)))
 
         # On passe le tout dans un MLP
@@ -314,7 +316,7 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
 
     # Recuperation des donnees
     x00tr, x01tr, x02tr, x10tr, x11tr, x12tr, x20tr, x21tr, x22tr = train_data 
-
+    # on a 901 graphes
     batches = torch.randperm(len(labels))
     # on split en batch de 64 puisque dataloader ne marche pas
     splitted = batches.split(64)
@@ -541,6 +543,7 @@ def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels, loss_fn
 
     # 10 folds
     for fold in range(len(x00_tr)):
+        print(f'fold {fold+1}')
         lr = 0.001
         dimin = 32
         model = Model(d1=3,d2=2*dimin,d3=2*dimin,d4=2*dimin,n_c=1).to(device)
@@ -590,8 +593,9 @@ def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels, loss_fn
     date = datetime.today().strftime('%Y-%m-%d_%H:%M:%S')
     path = './img/graphclassif/'
 
-    print(f'The final loss for test is {np.mean(foldtestloss)} its accuracy is {np.mean(foldtestperfs)}')
+    print(f'The final loss for test is {np.mean(foldtestloss)} its accuracy is {np.mean(foldtestperfs)} (std = {np.std(foldtestperfs)})')
     #The final loss for test is 0.5696458011865616 its accuracy is 0.7412564277648925 64 * 64
+    # The final loss for test is 0.6680425494909287 its accuracy is 0.7466216266155243 (std = 0.02586184571112952)
     # The final loss for test is 0.8550497889518738 its accuracy is 0.7348777234554291 128 * 128
     # toutes les performances et loss pour train et validation
     # ROC AUC image
