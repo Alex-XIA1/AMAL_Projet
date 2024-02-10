@@ -45,14 +45,14 @@ def main():
     B1 = load_variable(datapath + 'B1_mesh')
     B2 = load_variable(datapath+'B2_mesh')
 
-    nb_epoch = 2
+    nb_epoch = 150
     nb_hop = 1 # between 1 and 3
     early_stopping_patience = 50
 
     print("X",X.shape)
     #print("Y",Y.shape)
     print("Z_",Z_.shape)
-    base_factor = 0.1  # dimunue the size of the dataset for testing
+    base_factor = 0.1  # dimunue the size of the dataset for testing, set to 1 for the full dataset
     # Create train mask
     train_mask =  np.zeros((X.shape[0],))
     n_ = int(0.8*X.shape[0]*base_factor)
