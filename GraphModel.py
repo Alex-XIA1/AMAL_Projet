@@ -1,13 +1,11 @@
 import numpy as np
 import copy
 import matplotlib.pyplot as plt
-import seaborn as sns
 import h5py
 import torch
 import torch.nn as nn
 import torch.nn.functional
 import torch.utils.data as data
-import numpy as np
 import sys
 import time
 import dgl
@@ -162,69 +160,73 @@ def makeIncidence(edges, threeclique):
                 if count == 2 : break
     return res
 
-# Le modele utilise pour la tache de classification de graphe
-class Model(nn.Module):
-    # indim : dimension pour les donnees d'entree
-    def __init__(self,d1,d2,d3,d4,n_c, activation = nn.LeakyReLU, sortie = nn.Sigmoid):
-        super(Model,self).__init__()
+# Ceci n'est pas un transformer mais un embedding c'est rigolo.
+class TransformH_k(nn.Module):
+    """
+    d1 : dim hidden input
+    d2 : dim hidden
+    dimhop : liste des dimensions des entrees pour t-hop > 0
+    activation : fonction d'activation
+    maxT : le t-hop maximum
+    """
+    def __init__(self,d1,d2, dimhop, maxT, activation = nn.LeakyReLU):
+        super(TransformH_k,self).__init__()
 
         self.act = activation()
+        self.size = maxT
 
-        # BLOC 1 du modele
-        # Simplex de taille 0 (les sommets) pour t = 0,1,2
-        # Critique : les dimensions ne correspondent pas a la formule donnee dans l'article, c'est pas regulier !
-        # on peut verifier a partir des fichiers donnees
-        self.g0_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # g0_1 doit prendre en entree une dimension superieure a 6 !
-        self.g0_1 = nn.Sequential(nn.Linear(6,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 6 + 6 + ? + 3 = 15 + ? <- k = -1 c'est egal a 3 ? 
-        self.g0_2 = nn.Sequential(nn.Linear(18,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
+        # chaque fonction gk_t k une taille de simplexe et t un t-hop
+        tmp = [nn.Sequential(nn.Linear(dimhop[i],d1),self.act,nn.Linear(d1,d2),self.act,nn.Linear(d2,d2),self.act,nn.Linear(d2,d2),self.act) for i in range(len(dimhop))]
 
-        # BLOC 2 du modele
-        # Simplex de taille 1 (les aretes) pour t = 0,1,2
-        self.g1_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 3 + 3 + 3 + 3 = 12, c'est bon ici
-        self.g1_1 = nn.Sequential(nn.Linear(12,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 12 + 12 + 6 + 9 = 39 -> c'est bon
-        self.g1_2 = nn.Sequential(nn.Linear(39,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        
-        # BLOC 3 du modele
-        # Simplex de taille 2 (les triangles) pour t = 0.1.2
-        self.g2_0 = nn.Sequential(nn.Linear(d1,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 3 + 3 + 3 + ? = 9 + ? <- k = K+1 est egal a 0 ?
-        self.g2_1 = nn.Sequential(nn.Linear(9,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-        # 9 + 9 + 12 + ? = 30 + ? <- 0 aussi ?
-        self.g2_2 = nn.Sequential(nn.Linear(30,d2),self.act,nn.Linear(d2,d3),self.act,nn.Linear(d3,d3),self.act,nn.Linear(d3,d3),self.act)
-
-        #Un mlp tres basique
-        self.D = nn.Sequential(nn.Linear(3*3*d3,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,n_c),sortie()) #nn.Softmax(dim=0) for multi-class
+        self.gk_t = nn.ModuleList(tmp)
     
-    def forward(self, x0_0, x0_1, x0_2, x1_0, x1_1, x1_2, x2_0, x2_1, x2_2):
-        # Learning From simplicial aware features
-        # gt_k, t =0,1,2 et k = 0,1,2
-        out0_1 = self.g0_0(x0_0) 
-        out0_2 = self.g0_1(x0_1)
-        out0_3 = self.g0_2(x0_2) 
-        out1_1 = self.g1_0(x1_0) 
-        out1_2 = self.g1_1(x1_1) 
-        out1_3 = self.g1_2(x1_2)
-        out2_1 = self.g2_0(x2_0) 
-        out2_2 = self.g2_1(x2_1) 
-        out2_3 = self.g2_2(x2_2)
+    def forward(self, data):
+        # On verifie que la liste de donnee est bien coherente aux t-hops maximum
+        assert self.size == len(data)
+        #rint(data[0].shape)
+        # on recupere les outputs de tous les t-hops et on somme pour n'avoir qu'une seule ligne
+        outputs = [torch.sum(self.gk_t[i](data[i]),dim = 0) for i in range(self.size)]
+        torchoutput = torch.cat(outputs, dim = 0)
+
+        # juste pour verifier
+        #print("Ok the output is ", torchoutput.size())
+        return torchoutput
+
+
+class GraphModel(nn.Module):
+    def __init__(self,dimhop,d2,d3,d4,n_c, maxT, maxK, activation = nn.LeakyReLU, sortie = nn.Sigmoid):
+        """
+        d2 : dim hidden input
+        d3 : dim hidden
+        d4 : dim hidden du decodeur
+        dimhop : liste de liste des dimensions des entrees pour t-hop > 0
+        activation : fonction d'activation
+        maxT : le t-hop maximum
+        n_c : dimension finale
+        sortie : activation de sortie
+        """
+        super(GraphModel,self).__init__()
+
+        self.act = activation()
+        self.maxt = maxT
+        self.maxk = maxK
+
+        # La liste des blocs H_k de tranformation de l'article
+        self.h_k = nn.ModuleList([TransformH_k(d2,d3, dimhop[i], maxT, activation) for i in range(maxK)])
+
+        self.decoder = nn.Sequential(nn.Linear(maxT*maxK*d3,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,d4),self.act,nn.Linear(d4,n_c),sortie())
+    
+    def forward(self,listeData):
+        # vérifier qu'on a bien un nombre de simplexes correspondant
+        assert self.maxk == len(listeData)
+
+        outputs = [self.h_k[i](listeData[i]) for i in range(self.maxk)]
+        phi = torch.cat(outputs,dim = 0)
+
+        #print("final dim of embedding is ",phi.shape)
+
+        return self.decoder(phi)
         
-        # On calcul H(k) qui correspond a la concatenation de chaque t-hop pour un k donne et en sommant les informations du simplexe
-        # dim3 * 3 ici
-        xi_in0 = torch.cat((torch.sum((out0_1),0),torch.sum((out0_2),0),torch.sum((out0_3),0)),0)
-        xi_in1 = torch.cat((torch.sum((out1_1),0),torch.sum((out1_2),0),torch.sum((out1_3),0)),0)
-        xi_in2 = torch.cat((torch.sum((out2_1),0),torch.sum((out2_2),0),torch.sum((out2_3),0)),0)
-
-        # La concatenation finale de tous les blocs "attention" avant le passage dans le MLP.
-        # dim3 * 3 * 3
-        phi_in = torch.cat(((xi_in0),(xi_in1),(xi_in2)))
-
-        # On passe le tout dans un MLP
-        final_out = self.D(phi_in) 
-        return final_out
 
 
 # one hot du type d'atome (quels sont les atomes ?)
@@ -338,10 +340,17 @@ def train_epoch(train_data, labels, model, loss_fn, optim, device = None, num_cl
             x2_2 = x22tr[b]
             optim.zero_grad()
             # Predict de l'element du batch
-            yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+            # yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
+		  	# torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	# torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
+		  	# torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+            yhat = torch.cat((yhat, model([[torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
+		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device)]])), 0)
+        
+        # print("It works ")
+        # exit()
         
         yhats = torch.where(yhat > 0.5, 1, 0)
         #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -387,10 +396,10 @@ def valida_epoch(valid_data, labels, model, loss_fn, device = None, num_classes 
             x2_1 = x21tr[b]
             x2_2 = x22tr[b]
             # Predict de l'element du batch
-            yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+            yhat = torch.cat((yhat, model([[torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
+		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device)]])), 0)
         
         yhats = torch.where(yhat > 0.5, 1, 0)
         #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -432,10 +441,10 @@ def test_valide(valid_data, labels, model, loss_fn, device = None, num_classes =
         x2_1 = x21tr[i]
         x2_2 = x22tr[i]
         # Predict de l'element du batch
-        yhat = torch.cat((yhat, model(torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
-		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device),torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device),torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
-		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device))), 0)
+        yhat = torch.cat((yhat, model([[torch.tensor(x0_0).type(torch.FloatTensor).to(device),torch.tensor(x0_1).type(torch.FloatTensor).to(device),
+		  	torch.tensor(x0_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x1_0).type(torch.FloatTensor).to(device),torch.Tensor(x1_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x1_2).type(torch.FloatTensor).to(device)],[torch.Tensor(x2_0).type(torch.FloatTensor).to(device),torch.Tensor(x2_1).type(torch.FloatTensor).to(device),
+		  	torch.Tensor(x2_2).type(torch.FloatTensor).to(device)]])), 0)
         
     yhats = torch.where(yhat > 0.5, 1, 0)
     #print(f'yhat is {yhat.size()} and labels is {labels[e].size()}')
@@ -544,19 +553,21 @@ def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels, loss_fn
     # 10 folds
     for fold in range(len(x00_tr)):
         print(f'fold {fold+1}')
+        
+        trainf = (x00_tr[fold], x01_tr[fold], x02_tr[fold], x10_tr[fold], x11_tr[fold], x12_tr[fold], x20_tr[fold], x21_tr[fold], x22_tr[fold])
+        valf = (x00_val[fold], x01_val[fold], x02_val[fold], x10_val[fold], x11_val[fold], x12_val[fold], x20_val[fold], x21_val[fold], x22_val[fold])
+        testf = (x00_test[fold], x01_test[fold], x02_test[fold], x10_test[fold], x11_test[fold], x12_test[fold], x20_test[fold], x21_test[fold], x22_test[fold])
+
         lr = 0.001
-        dimin = 32
-        model = Model(d1=3,d2=2*dimin,d3=2*dimin,d4=2*dimin,n_c=1).to(device)
+        dimin = 64
+        #model = Model(d1=3,d2=dimin,d3=dimin,d4=dimin,n_c=1).to(device)
+        model = GraphModel([[3, 6, 18], [3, 12, 39], [3, 9, 30]],dimin, dimin, dimin, 1, 3, 3 ).to(device)
         optim = torch.optim.Adam(list(model.parameters()),lr = lr)
         optim.zero_grad()
         epochtrainloss = []
         epochtrainperfs = []
         epochvalidloss = []
         epochvalidperfs = []
-        
-        trainf = (x00_tr[fold], x01_tr[fold], x02_tr[fold], x10_tr[fold], x11_tr[fold], x12_tr[fold], x20_tr[fold], x21_tr[fold], x22_tr[fold])
-        valf = (x00_val[fold], x01_val[fold], x02_val[fold], x10_val[fold], x11_val[fold], x12_val[fold], x20_val[fold], x21_val[fold], x22_val[fold])
-        testf = (x00_test[fold], x01_test[fold], x02_test[fold], x10_test[fold], x11_test[fold], x12_test[fold], x20_test[fold], x21_test[fold], x22_test[fold])
 
         # pour chaque fold on fait 150 epochs
         for epoch in tqdm(np.arange(num_epoch)):
