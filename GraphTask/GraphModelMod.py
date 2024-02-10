@@ -434,7 +434,8 @@ def runCrossVal(tdata, tlabels, vdata, val_labels, testdata, testlabels , loss_f
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # lr = 0.001
-# model = Model(d1=3,d2=2*32,d3=2*32,d4=2*32,n_c=1).to(device)
+# dimin = 64
+# model = GraphModel([[3, 6], [3, 12], [3, 9]],dimin, dimin, dimin, 1, 2, 3).to(device)
 # optim = torch.optim.Adam(list(model.parameters()),lr = lr)
 # optim.zero_grad()
 
@@ -453,6 +454,8 @@ valdata = (x0_0_val, x0_1_val, x0_2_val, x1_0_val, x1_1_val, x1_2_val, x2_0_val,
 testdata = (x0_0_test, x0_1_test, x0_2_test, x1_0_test, x1_1_test, x1_2_test, x2_0_test, x2_1_test, x2_2_test)
 
 runCrossVal(indata ,training_labels, valdata, val_labels, testdata, testing_labels)
+
+
 #print(len(training_labels[0]))
 
 # sur le fold 0

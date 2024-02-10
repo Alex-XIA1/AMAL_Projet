@@ -485,6 +485,13 @@ valdata = (x0_0_val, x0_1_val, x0_2_val, x1_0_val, x1_1_val, x1_2_val, x2_0_val,
 testdata = (x0_0_test, x0_1_test, x0_2_test, x1_0_test, x1_1_test, x1_2_test, x2_0_test, x2_1_test, x2_2_test)
 
 runCrossVal(indata ,training_labels, valdata, val_labels, testdata, testing_labels)
+
+# lr = 0.001
+# dimin = 64
+# #model = Model(d1=3,d2=dimin,d3=dimin,d4=dimin,n_c=1).to(device)
+# model = GraphModel([[3, 6, 18], [3, 12, 39], [3, 9, 30]],dimin, dimin, dimin, 1, 3, 3 ).to(device)
+# optim = torch.optim.Adam(list(model.parameters()),lr = lr)
+# optim.zero_grad()
 #run(model, indata ,alllabstr, valdata, alllabsval, testdata, alllabstest, optim)
 #print(len(training_labels[0]))
 
