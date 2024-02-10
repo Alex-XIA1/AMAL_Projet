@@ -18,3 +18,14 @@ Vidéo d'un séminaire par les auteurs :
 https://www.youtube.com/watch?v=CNishpvy1lA 
 
 
+Les dossiers tacheTraj et tacheClassif correspondent aux dossiers de tâches de prédiction de trajectoire et de classification respectivement.
+
+GraphModel.py : fichier contenant la réimplémentation du modèle de l'article et les expériences.
+GraphModelSimple.py : fichier contenant les expériences d'un modèle simplifié.
+GraphModelMod.py : fichier contenant les expériences pour une modification du modèle initial.
+
+ModelTraj.py : ????
+ModelTraj_with_validation : ???
+
+Le dossier img contient quelques images de nos expériences.
+Les ZIP contiennent les datasets fournis par les auteurs ainsi que les prétraitements.
