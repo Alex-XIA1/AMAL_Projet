@@ -1,0 +1,5 @@
+Minimum validation loss:  1.7696648359298706
+Maximum validation accuracy:  0.2937500081956387
+Minimum training loss:  1.5895467154681682
+Maximum training accuracy:  0.9828124977648258
+Average time per epoch:  0.4177898416519165

@@ -1,0 +1,1 @@
+Ce dossier contient les résultats de la prédiction de trajectoire qui s'applique sur les données Mesh et Ocean. Dan le dossier Mesh, plusieurs dossier sont présentés. Il sont nommés comme 3_1, 3_2, 3_3. Le premier chiffre est le nombre de simplexe. Le deuxième chiffre est le nombre de hop. Pareil pour le dossier Ocean.

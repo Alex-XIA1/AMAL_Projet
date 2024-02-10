@@ -17,6 +17,7 @@ https://openreview.net/forum?id=eUgS9Ig8JG
 Vidéo d'un séminaire par les auteurs :
 https://www.youtube.com/watch?v=CNishpvy1lA 
 
+Application du modèle sur la tâche de prédiction de trajectoire est dans le dossier prediction_trajectory. L'explication de la structure du code est dans le fichier readme.md qui est dans le dossier prediction_trajectory.
 
 Les dossiers tacheTraj et tacheClassif correspondent aux dossiers de tâches de prédiction de trajectoire et de classification respectivement.
 
