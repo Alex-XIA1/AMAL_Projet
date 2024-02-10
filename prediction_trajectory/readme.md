@@ -1,0 +1,2 @@
+Ce dossier contient les scripts pour la prédiction de trajectoire, qui sont respectivement dans le dossier Mesh et Ocean.
+Les résultats sont dans le dossier resultat. Les données sont dant le dossier tp.
