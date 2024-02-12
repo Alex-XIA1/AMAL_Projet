@@ -19,7 +19,7 @@ https://www.youtube.com/watch?v=CNishpvy1lA
 
 Application du modèle sur la tâche de prédiction de trajectoire est dans le dossier prediction_trajectory. L'explication de la structure du code est dans le fichier readme.md qui est dans le dossier prediction_trajectory.
 
-Les dossiers tacheTraj et tacheClassif correspondent aux dossiers de tâches de prédiction de trajectoire et de classification respectivement.
+Le dossier GraphTask correspond au dossier de tâche de classification
 
 GraphModel.py : fichier contenant la réimplémentation du modèle de l'article et les expériences.
 GraphModelSimple.py : fichier contenant les expériences d'un modèle simplifié.
